@@ -58,24 +58,59 @@ const getReturnTableRecords = async(_,res,next)=>{
     }
 }
 
-// delete return record
-const deleteReturnTableRecord = async(req,res,next)=>{
-    try {
-        const {order_id} = req.body;
-        if(!order_id){
-            throw new ApiError(409,"order_id required");
-        }
-        const findRecord = await ReturnTable.findOne({order_id});
-        if(!findRecord){
-          throw new ApiError(404,"Record not found");
-        }
-        await ReturnTable.findByIdAndDelete(findRecord._id);
-        res.status(200).json(new ApiResponse(200,`${order_id} deleted successfully!.`));
 
-    } catch (error) {
-        next(error)
+// delete return record
+// const deleteReturnTableRecord = async(req,res,next)=>{
+//     try {
+//         const {order_id, styleNumber, size} = req.body;
+//         if(!order_id && !styleNumber && !size || styleNumber && !size || !styleNumber && size){
+//             throw new ApiError(409,"order_id or style number and size required");
+//         }
+//         const findRecord = await ReturnTable.findOne($or:[{order_id},{styleNumber,size}]);
+//         if(!findRecord){
+//           throw new ApiError(404,"Record not found");
+//         }
+//         await ReturnTable.findByIdAndDelete(findRecord._id);
+//         res.status(200).json(new ApiResponse(200,`${order_id} deleted successfully!.`));
+
+//     } catch (error) {
+//         next(error)
+//     }
+// }
+
+const deleteReturnTableRecord = async (req, res, next) => {
+  try {
+    const { order_id, styleNumber, size } = req.body;
+
+    // Validate input
+    if (
+      (!order_id && (!styleNumber || !size)) ||
+      (styleNumber && !size) ||
+      (!styleNumber && size)
+    ) {
+      throw new ApiError(409, "order_id or both styleNumber and size are required");
     }
-}
+
+    // Build dynamic query
+    const query = order_id
+      ? { order_id }
+      : { styleNumber, size };
+
+    const findRecord = await ReturnTable.findOne(query);
+
+    if (!findRecord) {
+      throw new ApiError(404, "Record not found");
+    }
+
+    await ReturnTable.findByIdAndDelete(findRecord._id);
+
+    res.status(200).json(
+      new ApiResponse(200, `${order_id || styleNumber + "-" + size} deleted successfully!`)
+    );
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {addReturnTableRecord,getReturnTableRecords,deleteReturnTableRecord}

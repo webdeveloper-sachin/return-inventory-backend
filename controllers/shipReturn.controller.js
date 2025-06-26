@@ -7,26 +7,38 @@ const ApiResponse = require("../utils/ApiResponse");
 // add record 
 const shipReturn = async(req,res,next)=>{
    try {
-     const {order_id} = req.body;
-     if(!order_id){
-         throw new ApiError(409,"order_id required");
-     }
-     const record = await PressTable.findOne({order_id});
+     const {order_id , style_number, Size} = req.body;
+
+     // Validate input
+        if (
+          (!order_id && (!style_number || !Size)) ||
+          (style_number && !Size) ||
+          (!style_number && Size)
+        ) {
+          throw new ApiError(409, "order_id or both style_number and Size are required");
+        }
+    
+        // Build dynamic query
+        const query = order_id
+          ? { order_id }
+          : { styleNumber:style_number,size: Size };
+
+     const record = await PressTable.findOne(query);
      if(!record){
-         throw new ApiError(404,`${order_id} record not found.`);
+         throw new ApiError(404,`${order_id || style_number +"-"+ Size}  not found.`);
      }
  
     //  fetching press table record and deleting from press table and added to ship record 
     const {styleNumber,size,color,employee_name,channel} = record;
     
     // check if record exists 
-    const recordExists = await ShipReturn.findOne({order_id});
+    const recordExists = await ShipReturn.findOne(query);
 
     if(recordExists){
         throw new ApiError(409,`${order_id} already exists`)
     }
     const addedToShipRecord = await ShipReturn.create({
-       styleNumber,size,color,location:"Shipped",employee_name,order_id ,channel
+       styleNumber,size,color,location:"Shipped",employee_name,order_id:record?.order_id ,channel
     })
 
     const prssTableRecordDelete = await PressTable.findByIdAndDelete(record._id)

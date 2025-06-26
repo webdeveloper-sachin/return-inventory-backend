@@ -4,7 +4,7 @@ const router = express.Router();
 
 router.route("/get-records").get(getReturnTableRecords);
 router.route("/add-record").post(addReturnTableRecord);
-router.route("/delete-record").delete(deleteReturnTableRecord);
+router.route("/delete-record").post(deleteReturnTableRecord);
 
 
 module.exports = router;

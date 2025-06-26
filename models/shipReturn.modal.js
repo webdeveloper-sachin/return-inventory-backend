@@ -31,7 +31,6 @@ const shipReturnSchema = new mongoose.Schema({
   },
   order_id:{
     type:Number,
-    required:true
   }
 },{timestamps:true});
 
