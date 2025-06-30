@@ -4,6 +4,7 @@ const ConfirmOrder = require("../models/confirmOrder.modal");
 const CancelOrder = require("../models/cancelOrder.modal");
 const ApiError = require("../utils/ApiError");
 
+
 // get all pending orders 
 const pendingOrders = async(_,res,next)=>{
     try {
@@ -25,77 +26,73 @@ const addToPendingOrder = async (req, res, next) => {
     const { orders } = req.body;
 
     if (!Array.isArray(orders) || orders.length === 0) {
-      return res.status(400).json(new ApiResponse(400, "No orders provided."));
+      return next(new ApiError(400, "No orders provided."));
     }
 
-    const orderIds = orders.map(order => order.order_id);
-
-    // Find existing orders with those order_ids
-    const existingOrders = await PendingOrder.find({ order_id: { $in: orderIds } });
-    const existingOrderIds = new Set(existingOrders.map(order => order.order_id));
-
-    // Filter out orders that already exist
-    const newOrders = orders.filter(order => !existingOrderIds.has(order.order_id));
-
-    if (newOrders.length === 0) {
-      return res.status(200).json(new ApiResponse(200, "All orders already exist. No new orders added."));
+    // Optional: filter out orders with missing order_id or required fields
+    const validOrders = orders.filter(order => order.order_id);
+    if (validOrders.length === 0) {
+      return next(new ApiError(400, "All orders are missing order_id."));
     }
 
-    const insertedOrders = await PendingOrder.insertMany(newOrders, { ordered: false });
+    const insertedOrders = await PendingOrder.insertMany(validOrders, { ordered: false });
 
-    return res
-      .status(201)
-      .json(new ApiResponse(201, `${insertedOrders.length} new order(s) added.`, insertedOrders));
+    res.status(201).json(new ApiResponse(
+      201,
+      `${insertedOrders.length} new order(s) added to pending list.`,
+      insertedOrders
+    ));
   } catch (error) {
     next(error);
   }
-
-
 };
 
 // add order to confirm order 
 const addToConfirmOrders = async (req, res, next) => {
   try {
-    const { order_id, styleNumber, size, order_date, quantity } = req.body;
+    const {
+      order_id,
+      styleNumber,
+      size,
+      quantity,
+      order_date,
+      shipping_method,
+      order_status,
+      contact_number,
+      payment_status,
+    } = req.body;
 
     // 1. Validate required fields
-    if ([order_id, styleNumber, size, order_date, quantity].some((item) => !item)) {
+    if ([ order_id, styleNumber, size, quantity, order_date, shipping_method, order_status, contact_number, payment_status ].some((item) => !item)) {
       return next(new ApiError(400, "All fields are required."));
     }
 
-    // 2. Check for duplicate order_id
-    const orderIdExists = await ConfirmOrder.findOne({ order_id });
-    if (orderIdExists) {
-      return next(
-        new ApiError(400, "This order already exists in confirm order.", orderIdExists)
-      );
-    }
 
-    // 3. Insert into ConfirmOrder
+
+    // 2. Insert into ConfirmOrder
     const confirmOrderInserted = await ConfirmOrder.create({
       order_id,
       styleNumber,
       size,
-      order_date,
       quantity,
+      order_date,
+      shipping_method,
+      order_status,
+      contact_number,
+      payment_status,
     });
 
-    // 4. Remove from PendingOrder if it exists
-    const pendingOrder = await PendingOrder.findOne({ order_id });
-    if (pendingOrder) {
-      await PendingOrder.findByIdAndDelete(pendingOrder._id);
-    }
+    // 3. Remove from PendingOrder if exists
+    await PendingOrder.findOneAndDelete({ order_id });
 
-    // 5. Success response
-    return res
-      .status(201)
-      .json(
-        new ApiResponse(
-          201,
-          `${confirmOrderInserted.order_id} added to confirm order`,
-          confirmOrderInserted
-        )
-      );
+    // 4. Success response
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        `${confirmOrderInserted.order_id} added to confirm order.`,
+        confirmOrderInserted
+      )
+    );
   } catch (error) {
     next(error);
   }
@@ -105,50 +102,54 @@ const addToConfirmOrders = async (req, res, next) => {
 
 const addToCancelOrders = async (req, res, next) => {
   try {
-    const { order_id, styleNumber, size, order_date, quantity } = req.body;
+    const {
+      order_id,
+      styleNumber,
+      size,
+      quantity,
+      order_date,
+      shipping_method,
+      order_status,
+      contact_number,
+      payment_status,
+    } = req.body;
 
     // 1. Validate required fields
-    if ([order_id, styleNumber, size, order_date, quantity].some((item) => !item)) {
+    if ([ order_id, styleNumber, size, quantity, order_date, shipping_method, order_status, contact_number, payment_status ].some((item) => !item)) {
       return next(new ApiError(400, "All fields are required."));
     }
 
-    // 2. Check for duplicate order_id
-    const orderIdExists = await CancelOrder.findOne({ order_id });
-    if (orderIdExists) {
-      return next(
-        new ApiError(400, "This order already exists in cancel order.", orderIdExists)
-      );
-    }
 
-    // 3. Insert into ConfirmOrder
+
+    // 2. Insert into ConfirmOrder
     const cancelOrderInserted = await CancelOrder.create({
       order_id,
       styleNumber,
       size,
-      order_date,
       quantity,
+      order_date,
+      shipping_method,
+      order_status,
+      contact_number,
+      payment_status,
     });
 
-    // 4. Remove from PendingOrder if it exists
-    const pendingOrder = await PendingOrder.findOne({ order_id });
-    if (pendingOrder) {
-      await PendingOrder.findByIdAndDelete(pendingOrder._id);
-    }
+    // 3. Remove from PendingOrder if exists
+    await PendingOrder.findOneAndDelete({ order_id });
 
-    // 5. Success response
-    return res
-      .status(201)
-      .json(
-        new ApiResponse(
-          201,
-          `${cancelOrderInserted.order_id} added to confirm order`,
-          cancelOrderInserted
-        )
-      );
+    // 4. Success response
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        `${cancelOrderInserted.order_id} added to cancel order.`,
+        cancelOrderInserted
+      )
+    );
   } catch (error) {
     next(error);
   }
 };
+
 
 
 
